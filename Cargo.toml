@@ -1,0 +1,14 @@
+[workspace]
+members = [
+  "rsp-core",
+  "rsp-io",
+  "rsp-cli"
+]
+resolver = "2"
+
+[workspace.dependencies]
+image = "0.25.8"
+nalgebra = "0.34.1"
+rayon = "1.11.0"
+serde = { version = "1.0.228", features = ["derive"]}
+
