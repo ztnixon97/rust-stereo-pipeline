@@ -4,3 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+rsp-core = { path = "../rsp-core" }
+gdal = "0.18.0"
+nalgebra = {workspace = true}
+ndarray = {workspace = true}
+thiserror = {workspace = true}
