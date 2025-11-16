@@ -1,51 +1,15 @@
-
 use gdal::Dataset;
 use nalgebra::{Vector3, UnitQuaternion};
-use thiserror::Error;
-
-/// RPC coefficients extracted from image metadata
-#[derive(Debug, Clone)]
-pub struct RpcCoefficients {
-    // Polynomial coefficients (20 each)
-    pub line_num_coeff: [f64; 20],
-    pub line_den_coeff: [f64; 20],
-    pub samp_num_coeff: [f64; 20],
-    pub samp_den_coeff: [f64; 20],
-    
-    // Normalization offsets and scales
-    pub lat_off: f64,
-    pub lat_scale: f64,
-    pub lon_off: f64,
-    pub lon_scale: f64,
-    pub height_off: f64,
-    pub height_scale: f64,
-    pub line_off: f64,
-    pub line_scale: f64,
-    pub samp_off: f64,
-    pub samp_scale: f64,
-}
-
-#[derive(Error, Debug)]
-pub enum MetadataError {
-    #[error("RPC metadata not found")]
-    RpcNotFound,
-    #[error("Failed to parse coefficient: {0}")]
-    ParseError(String),
-    #[error("Missing parameter: {0}")]
-    MissingParameter(String),
-}
+use rsp_core::sensor::RpcCoefficients;
+use rsp_core::error::{RspError, Result};
 
 /// Container for all image metadata
 #[derive(Debug, Clone, Default)]
 pub struct ImageMetadata {
     pub rpc: Option<RpcCoefficients>,
-    
-    // External metadata (from trajectory files, etc.)
-    pub gps_position: Option<Vector3<f64>>,  // ECEF
+    pub gps_position: Option<Vector3<f64>>,
     pub imu_orientation: Option<UnitQuaternion<f64>>,
     pub timestamp: Option<f64>,
-    
-    // Reference to camera model (stored separately)
     pub camera_id: Option<String>,
 }
 
@@ -65,10 +29,10 @@ impl ImageMetadata {
 }
 
 /// Extract RPC from GDAL dataset
-fn extract_rpc(dataset: &Dataset) -> Result<RpcCoefficients, MetadataError> {
+fn extract_rpc(dataset: &Dataset) -> Result<RpcCoefficients> {
     let metadata = dataset
         .metadata_domain("RPC")
-        .ok_or(MetadataError::RpcNotFound)?;
+        .ok_or_else(|| RspError::Io("RPC metadata not found".to_string()))?;
     
     Ok(RpcCoefficients {
         line_num_coeff: parse_coeff_array(&metadata, "LINE_NUM_COEFF")?,
@@ -89,39 +53,37 @@ fn extract_rpc(dataset: &Dataset) -> Result<RpcCoefficients, MetadataError> {
     })
 }
 
-/// Parse array of 20 coefficients from GDAL metadata
 fn parse_coeff_array(
     metadata: &std::collections::HashMap<String, String>,
     prefix: &str,
-) -> Result<[f64; 20], MetadataError> {
+) -> Result<[f64; 20]> {
     let mut coeffs = [0.0; 20];
     
     for i in 1..=20 {
         let key = format!("{}_{}", prefix, i);
         let value = metadata
             .get(&key)
-            .ok_or_else(|| MetadataError::MissingParameter(key.clone()))?;
+            .ok_or_else(|| RspError::Io(format!("Missing RPC parameter: {}", key)))?;
         
         coeffs[i - 1] = value
             .trim()
             .parse()
-            .map_err(|_| MetadataError::ParseError(key))?;
+            .map_err(|_| RspError::Io(format!("Failed to parse RPC coefficient: {}", key)))?;
     }
     
     Ok(coeffs)
 }
 
-/// Parse single scalar value from GDAL metadata
 fn parse_single(
     metadata: &std::collections::HashMap<String, String>,
     key: &str,
-) -> Result<f64, MetadataError> {
+) -> Result<f64> {
     let value = metadata
         .get(key)
-        .ok_or_else(|| MetadataError::MissingParameter(key.to_string()))?;
+        .ok_or_else(|| RspError::Io(format!("Missing RPC parameter: {}", key)))?;
     
     value
         .trim()
         .parse()
-        .map_err(|_| MetadataError::ParseError(key.to_string()))
+        .map_err(|_| RspError::Io(format!("Failed to parse RPC parameter: {}", key)))
 }
