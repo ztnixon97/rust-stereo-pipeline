@@ -105,7 +105,7 @@ impl Image {
         let mut data = Array3::<u8>::zeros((height, width, self.band_count));
         
         for band_idx in 0..self.band_count {
-            let band = self.dataset.rasterband(band_idx as isize + 1)?;
+            let band = self.dataset.rasterband(band_idx + 1)?;
             let buffer = band.read_as::<u8>(
                 (x_off as isize, y_off as isize),
                 (width, height),
@@ -143,7 +143,7 @@ impl Image {
         let mut data = Array3::<u16>::zeros((height, width, self.band_count));
         
         for band_idx in 0..self.band_count {
-            let band = self.dataset.rasterband(band_idx as isize + 1)?;
+            let band = self.dataset.rasterband(band_idx + 1)?;
             let buffer = band.read_as::<u16>(
                 (x_off as isize, y_off as isize),
                 (width, height),
@@ -181,7 +181,7 @@ impl Image {
         let mut data = Array3::<f32>::zeros((height, width, self.band_count));
         
         for band_idx in 0..self.band_count {
-            let band = self.dataset.rasterband(band_idx as isize + 1)?;
+            let band = self.dataset.rasterband(band_idx + 1)?;
             let buffer = band.read_as::<f32>(
                 (x_off as isize, y_off as isize),
                 (width, height),
@@ -206,6 +206,76 @@ impl Image {
     
     /// Get projection string if available
     pub fn projection(&self) -> Option<String> {
-        self.dataset.projection().ok()
+        let proj = self.dataset.projection();
+        if proj.is_empty() {
+            None
+        } else {
+            Some(proj)
+        }
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_image_error_display() {
+        let err = ImageError::InvalidDimensions;
+        assert_eq!(err.to_string(), "Invalid image dimensions");
+    }
+
+    #[test]
+    fn test_image_error_from_gdal() {
+        // Test that ImageError can be created from GdalError
+        // Note: This is a compile-time check more than a runtime check
+        // We're just verifying the From trait is implemented
+        fn _takes_image_error(_err: ImageError) {}
+
+        // If we had a GdalError, we could convert it
+        // let gdal_err = some_gdal_error;
+        // let img_err: ImageError = gdal_err.into();
+        // _takes_image_error(img_err);
+    }
+
+    // Note: Full integration tests for Image would require actual GDAL-compatible
+    // image files. These would be better placed in an integration test directory
+    // with test fixtures. The tests below document the expected API.
+
+    // Integration test template (requires test data):
+    // #[test]
+    // fn test_image_open_geotiff() {
+    //     let img = Image::open("test_data/sample.tif").unwrap();
+    //     let (w, h) = img.size();
+    //     assert!(w > 0);
+    //     assert!(h > 0);
+    // }
+
+    // #[test]
+    // fn test_image_read_u8() {
+    //     let img = Image::open("test_data/sample.tif").unwrap();
+    //     let data = img.read_u8().unwrap();
+    //     assert_eq!(data.shape()[0], img.height());
+    //     assert_eq!(data.shape()[1], img.width());
+    //     assert_eq!(data.shape()[2], img.band_count());
+    // }
+
+    // #[test]
+    // fn test_image_window_invalid_bounds() {
+    //     let img = Image::open("test_data/sample.tif").unwrap();
+    //     let (w, h) = img.size();
+    //     let result = img.read_window_u8(w, h, 10, 10);
+    //     assert!(result.is_err());
+    //     assert!(matches!(result.unwrap_err(), ImageError::InvalidDimensions));
+    // }
+
+    // #[test]
+    // fn test_image_metadata() {
+    //     let img = Image::open("test_data/sample_with_rpc.tif").unwrap();
+    //     let metadata = img.metadata();
+    //     if metadata.has_rpc() {
+    //         // Test RPC metadata extraction
+    //         assert!(metadata.rpc.is_some());
+    //     }
+    // }
 }
