@@ -17,6 +17,14 @@ pub(super) enum DistortionModel {
     },
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum DistortionError {
+    SingularJacobian,
+    NonConvergent,
+}
+
+type Result<T> = std::result::Result<T, DistortionError>;
+
 impl DistortionModel {
     /// Apply distortion to normalized image coordinates
     pub(super) fn distort(&self, x_norm: f64, y_norm: f64) -> (f64, f64) {
@@ -63,9 +71,9 @@ impl DistortionModel {
 
     /// Remove distortion from image coordinates using Newton-Raphson iteration
 
-    pub(super) fn undistort(&self, x_dist: f64, y_dist: f64) -> (f64, f64) {
+    pub(super) fn undistort(&self, x_dist: f64, y_dist: f64) -> Result<(f64, f64)> {
         match self {
-            DistortionModel::None => (x_dist, y_dist),
+            DistortionModel::None => Ok((x_dist, y_dist)),
             _ => {
                 let mut x = x_dist;
                 let mut y = y_dist;
@@ -76,7 +84,7 @@ impl DistortionModel {
                     let ry = y_dist - fy;
 
                     if rx.abs() < 1e-8 && ry.abs() < 1e-10 {
-                        break;
+                        return Ok((x, y));
                     }
 
                     // Finite-difference Jacobian
@@ -92,7 +100,7 @@ impl DistortionModel {
                     // Solve J * [dx, dy]^T = [rx, ry]^T
                     let det = j11 * j22 - j12 * j21;
                     if det.abs() < 1e-18 {
-                        break; // Degenerate Jacobian, bail
+                        return Err(DistortionError::SingularJacobian);
                     }
 
                     let dx = (j22 * rx - j12 * ry) / det;
@@ -102,21 +110,21 @@ impl DistortionModel {
                     y += dy;
                 }
 
-                (x, y)
+                Err(DistortionError::NonConvergent)
             }
         }
     }
 }
 #[cfg(test)]
 mod tests {
-    use super::DistortionModel;
+    use super::{DistortionError, DistortionModel};
 
     #[test]
     fn none_round_trip() {
         let m = DistortionModel::None;
         let (x, y) = (0.123, -0.456);
         let (xd, yd) = m.distort(x, y);
-        let (xu, yu) = m.undistort(xd, yd);
+        let (xu, yu) = m.undistort(xd, yd).unwrap();
         assert!((x - xu).abs() < 1e-12);
         assert!((y - yu).abs() < 1e-12);
     }
@@ -132,7 +140,7 @@ mod tests {
         };
         let (x, y) = (0.2, -0.15);
         let (xd, yd) = m.distort(x, y);
-        let (xu, yu) = m.undistort(xd, yd);
+        let (xu, yu) = m.undistort(xd, yd).unwrap();
         assert!((x - xu).abs() < 1e-6);
         assert!((y - yu).abs() < 1e-6);
     }
@@ -147,8 +155,22 @@ mod tests {
         };
         let (x, y) = (0.3, 0.1);
         let (xd, yd) = m.distort(x, y);
-        let (xu, yu) = m.undistort(xd, yd);
+        let (xu, yu) = m.undistort(xd, yd).unwrap();
         assert!((x - xu).abs() < 1e-6);
         assert!((y - yu).abs() < 1e-6);
+    }
+
+    #[test]
+    fn signals_non_convergence() {
+        let m = DistortionModel::BrownConrady {
+            k1: 1e6,
+            k2: 1e6,
+            k3: 1e6,
+            p1: 1.0,
+            p2: -1.0,
+        };
+
+        let res = m.undistort(10.0, 10.0);
+        assert!(matches!(res, Err(DistortionError::NonConvergent)));
     }
 }

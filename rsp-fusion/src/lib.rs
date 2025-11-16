@@ -1,3 +1,5 @@
+//! Work in progress: this crate's public API is not yet implemented.
+
 pub fn add(left: u64, right: u64) -> u64 {
     left + right
 }

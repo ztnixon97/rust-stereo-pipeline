@@ -1,4 +1,4 @@
-use super::{distortion::DistortionModel, CameraModel};
+use super::{CameraModel, distortion::DistortionModel};
 use nalgebra::Vector3;
 
 /// Pinhole camera model with optional distortion
@@ -83,16 +83,16 @@ impl CameraModel for PinholeCamera {
         Some((u, v))
     }
 
-    fn unproject(&self, pixel: (f64, f64)) -> Vector3<f64> {
+    fn unproject(&self, pixel: (f64, f64)) -> Result<Vector3<f64>, super::DistortionError> {
         // Pixel to distorted normalized coordinates
         let x_dist = (pixel.0 - self.cx) / self.fx;
         let y_dist = (pixel.1 - self.cy) / self.fy;
 
         // Remove distortion
-        let (x_norm, y_norm) = self.distortion.undistort(x_dist, y_dist);
+        let (x_norm, y_norm) = self.distortion.undistort(x_dist, y_dist)?;
 
         // Ray in camera frame (unit vector)
-        Vector3::new(x_norm, y_norm, 1.0).normalize()
+        Ok(Vector3::new(x_norm, y_norm, 1.0).normalize())
     }
 
     fn image_size(&self) -> (usize, usize) {

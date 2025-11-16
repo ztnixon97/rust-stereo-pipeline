@@ -4,6 +4,7 @@ mod distortion;
 mod fisheye;
 mod pinhole;
 
+pub use distortion::DistortionError;
 pub use fisheye::FisheyeCamera;
 pub use pinhole::PinholeCamera;
 
@@ -17,7 +18,7 @@ pub trait CameraModel {
     fn project(&self, point_camera: &Vector3<f64>) -> Option<(f64, f64)>;
 
     /// Unproject image coordinates to unit ray in camera frame
-    fn unproject(&self, pixel: (f64, f64)) -> Vector3<f64>;
+    fn unproject(&self, pixel: (f64, f64)) -> Result<Vector3<f64>, DistortionError>;
 
     /// Get image dimesnsions this camera is calibrated for
     fn image_size(&self) -> (usize, usize);

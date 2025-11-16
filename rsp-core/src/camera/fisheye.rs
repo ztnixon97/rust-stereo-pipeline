@@ -1,4 +1,4 @@
-use super::{distortion::DistortionModel, CameraModel};
+use super::{CameraModel, distortion::DistortionModel};
 use nalgebra::Vector3;
 
 /// Fisheye camera model
@@ -56,13 +56,13 @@ impl CameraModel for FisheyeCamera {
         Some((u, v))
     }
 
-    fn unproject(&self, pixel: (f64, f64)) -> Vector3<f64> {
+    fn unproject(&self, pixel: (f64, f64)) -> Result<Vector3<f64>, super::DistortionError> {
         let x_dist = (pixel.0 - self.cx) / self.fx;
         let y_dist = (pixel.1 - self.cy) / self.fy;
 
-        let (x_norm, y_norm) = self.distortion.undistort(x_dist, y_dist);
+        let (x_norm, y_norm) = self.distortion.undistort(x_dist, y_dist)?;
 
-        Vector3::new(x_norm, y_norm, 1.0).normalize()
+        Ok(Vector3::new(x_norm, y_norm, 1.0).normalize())
     }
 
     fn image_size(&self) -> (usize, usize) {
