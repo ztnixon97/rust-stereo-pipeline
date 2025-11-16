@@ -1,5 +1,5 @@
 use gdal::Dataset;
-use gdal::raster::{GDALDataType, RasterBand};
+use gdal::raster::{GdalDataType, RasterBand};
 use ndarray::Array3;
 use std::path::Path;
 use thiserror::Error;
@@ -15,7 +15,7 @@ pub enum ImageError {
     #[error("Invalid band type: expected {expected}, found {found:?}")]
     InvalidBandType {
         expected: &'static str,
-        found: GDALDataType,
+        found: GdalDataType,
     },
 }
 
@@ -124,12 +124,12 @@ impl Image {
             return Err(ImageError::InvalidDimensions);
         }
 
-        self.validate_band_types(GDALDataType::GDT_Byte, "u8")?;
+        self.validate_band_types(GdalDataType::UInt8, "u8")?;
 
         let mut data = Array3::<u8>::zeros((height, width, self.band_count));
 
         for band_idx in 0..self.band_count {
-            let band = self.dataset.rasterband(band_idx as isize + 1)?;
+            let band = self.dataset.rasterband(band_idx + 1)?;
             let buffer = band.read_as::<u8>(
                 (x_off as isize, y_off as isize),
                 (width, height),
@@ -164,12 +164,12 @@ impl Image {
             return Err(ImageError::InvalidDimensions);
         }
 
-        self.validate_band_types(GDALDataType::GDT_UInt16, "u16")?;
+        self.validate_band_types(GdalDataType::UInt16, "u16")?;
 
         let mut data = Array3::<u16>::zeros((height, width, self.band_count));
 
         for band_idx in 0..self.band_count {
-            let band = self.dataset.rasterband(band_idx as isize + 1)?;
+            let band = self.dataset.rasterband(band_idx + 1)?;
             let buffer = band.read_as::<u16>(
                 (x_off as isize, y_off as isize),
                 (width, height),
@@ -204,12 +204,12 @@ impl Image {
             return Err(ImageError::InvalidDimensions);
         }
 
-        self.validate_band_types(GDALDataType::GDT_Float32, "f32")?;
+        self.validate_band_types(GdalDataType::Float32, "f32")?;
 
         let mut data = Array3::<f32>::zeros((height, width, self.band_count));
 
         for band_idx in 0..self.band_count {
-            let band = self.dataset.rasterband(band_idx as isize + 1)?;
+            let band = self.dataset.rasterband(band_idx + 1)?;
             let buffer = band.read_as::<f32>(
                 (x_off as isize, y_off as isize),
                 (width, height),
@@ -234,16 +234,21 @@ impl Image {
 
     /// Get projection string if available
     pub fn projection(&self) -> Option<String> {
-        self.dataset.projection().ok()
+        let projection = self.dataset.projection();
+        if projection.is_empty() {
+            None
+        } else {
+            Some(projection)
+        }
     }
 
     fn validate_band_types(
         &self,
-        expected: GDALDataType,
+        expected: GdalDataType,
         expected_name: &'static str,
     ) -> Result<()> {
         for band_idx in 1..=self.band_count {
-            let band = self.dataset.rasterband(band_idx as isize)?;
+            let band = self.dataset.rasterband(band_idx)?;
             validate_band_type(&band, expected, expected_name)?;
         }
 
@@ -253,7 +258,7 @@ impl Image {
 
 fn validate_band_type(
     band: &RasterBand,
-    expected: GDALDataType,
+    expected: GdalDataType,
     expected_name: &'static str,
 ) -> Result<()> {
     let actual = band.band_type();
@@ -275,14 +280,14 @@ mod tests {
     fn mem_dataset_u8() -> Dataset {
         DriverManager::get_driver_by_name("MEM")
             .unwrap()
-            .create_with_band_type::<u8>("", 2, 2, 1)
+            .create_with_band_type::<u8, _>("", 2, 2, 1)
             .unwrap()
     }
 
     fn mem_dataset_f32() -> Dataset {
         DriverManager::get_driver_by_name("MEM")
             .unwrap()
-            .create_with_band_type::<f32>("", 2, 2, 1)
+            .create_with_band_type::<f32, _>("", 2, 2, 1)
             .unwrap()
     }
 

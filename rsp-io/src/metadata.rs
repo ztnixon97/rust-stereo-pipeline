@@ -1,4 +1,5 @@
-use gdal::Dataset;
+use gdal::{Dataset, Metadata};
+use std::collections::HashMap;
 use nalgebra::{UnitQuaternion, Vector3};
 use thiserror::Error;
 
@@ -68,6 +69,15 @@ fn extract_rpc(dataset: &Dataset) -> Result<RpcCoefficients, MetadataError> {
     let metadata = dataset
         .metadata_domain("RPC")
         .ok_or(MetadataError::RpcNotFound)?;
+
+    let metadata: HashMap<String, String> = metadata
+        .into_iter()
+        .filter_map(|entry| {
+            entry
+                .split_once('=')
+                .map(|(k, v)| (k.to_owned(), v.to_owned()))
+        })
+        .collect();
 
     Ok(RpcCoefficients {
         line_num_coeff: parse_coeff_array(&metadata, "LINE_NUM_COEFF")?,
